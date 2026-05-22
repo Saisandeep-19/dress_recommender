@@ -1,5 +1,5 @@
 keras==3.12.2
-tensorflow-cpu==2.16.2
+tensorflow-cpu
 opencv-python-headless==4.10.0.84
 mediapipe==0.10.21
 numpy==1.26.4
