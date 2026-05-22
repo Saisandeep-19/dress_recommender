@@ -3,4 +3,4 @@ opencv-python-headless
 mediapipe
 numpy==2.4.6
 Pillow==12.2.0
-streamlit==1.32.0
+streamlit>=1.40.0
