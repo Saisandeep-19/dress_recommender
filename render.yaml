@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: skin-tone-analyzer
+    runtime: python
+    buildCommand: |
+      apt-get update && apt-get install -y libgl1 libglib2.0-0t64 libsm6 libxext6 libxrender1
+      pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+        

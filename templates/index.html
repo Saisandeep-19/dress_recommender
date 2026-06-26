@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Skin Tone Analyzer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <span class="logo">✦ ToneMatch</span>
+      <span class="tagline">AI-powered skin tone & color analysis</span>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- Hero -->
+    <section class="hero">
+      <h1>Discover Your<br /><em>Perfect Palette</em></h1>
+      <p>Upload a photo and our AI analyzes your skin tone, undertone, and recommends the dress colors that suit you best.</p>
+    </section>
+
+    <!-- Upload -->
+    <section class="upload-section">
+      <div class="upload-card" id="dropzone">
+        <input type="file" id="fileInput" accept="image/jpeg,image/png" hidden />
+        <div class="upload-icon">📸</div>
+        <p class="upload-title">Drop your photo here</p>
+        <p class="upload-sub">or <button class="link-btn" onclick="document.getElementById('fileInput').click()">browse files</button></p>
+        <p class="upload-hint">JPG or PNG · Well-lit, front-facing · No sunglasses</p>
+      </div>
+    </section>
+
+    <!-- Loading -->
+    <div class="loading hidden" id="loading">
+      <div class="spinner"></div>
+      <p>Analyzing your skin tone…</p>
+    </div>
+
+    <!-- Results -->
+    <section class="results hidden" id="results">
+
+      <!-- Photos -->
+      <div class="photo-row">
+        <div class="photo-card">
+          <p class="card-label">Original Photo</p>
+          <img id="originalImg" src="" alt="Original" />
+        </div>
+        <div class="photo-card">
+          <p class="card-label">Face Region Detected</p>
+          <img id="overlayImg" src="" alt="Overlay" />
+          <p class="no-face hidden" id="noFace">No face detected</p>
+        </div>
+      </div>
+
+      <!-- Tone Result -->
+      <div class="result-card">
+        <div class="tone-header">
+          <div>
+            <span class="tone-badge" id="toneBadge">—</span>
+            <span class="undertone-badge" id="undertoneBadge">—</span>
+          </div>
+          <p class="tone-value" id="toneValue">Tone value: —</p>
+        </div>
+
+        <div class="divider"></div>
+
+        <p class="section-label">Class Probabilities</p>
+        <div class="prob-bars" id="probBars"></div>
+      </div>
+
+      <!-- Color Recommendations -->
+      <div class="result-card">
+        <p class="section-label">🎨 Recommended Dress Colors</p>
+        <div class="swatches" id="swatches"></div>
+      </div>
+
+      <!-- Try Again -->
+      <div class="try-again">
+        <button class="btn-outline" id="tryAgain">Try Another Photo</button>
+      </div>
+
+    </section>
+
+  </main>
+
+  <footer>
+    <p>Built with deep learning · MobileNetV2 · MediaPipe · ONNX Runtime</p>
+  </footer>
+
+  <script>
+    const fileInput   = document.getElementById('fileInput');
+    const dropzone    = document.getElementById('dropzone');
+    const loading     = document.getElementById('loading');
+    const results     = document.getElementById('results');
+    const originalImg = document.getElementById('originalImg');
+    const overlayImg  = document.getElementById('overlayImg');
+    const noFace      = document.getElementById('noFace');
+    const toneBadge   = document.getElementById('toneBadge');
+    const undertoneBadge = document.getElementById('undertoneBadge');
+    const toneValue   = document.getElementById('toneValue');
+    const probBars    = document.getElementById('probBars');
+    const swatches    = document.getElementById('swatches');
+    const tryAgain    = document.getElementById('tryAgain');
+
+    // Drag & drop
+    dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+    dropzone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropzone.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file) processFile(file);
+    });
+    dropzone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => { if (fileInput.files[0]) processFile(fileInput.files[0]); });
+
+    tryAgain.addEventListener('click', () => {
+      results.classList.add('hidden');
+      dropzone.parentElement.parentElement.classList.remove('hidden');
+      fileInput.value = '';
+    });
+
+    function processFile(file) {
+      // Show original preview
+      const reader = new FileReader();
+      reader.onload = e => { originalImg.src = e.target.result; };
+      reader.readAsDataURL(file);
+
+      // Show loading
+      dropzone.parentElement.parentElement.classList.add('hidden');
+      loading.classList.remove('hidden');
+      results.classList.add('hidden');
+
+      // Send to Flask
+      const formData = new FormData();
+      formData.append('image', file);
+
+      fetch('/analyze', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+          loading.classList.add('hidden');
+          if (data.error) {
+            alert('Error: ' + data.error);
+            dropzone.parentElement.parentElement.classList.remove('hidden');
+            return;
+          }
+          renderResults(data);
+          results.classList.remove('hidden');
+          results.scrollIntoView({ behavior: 'smooth' });
+        })
+        .catch(() => {
+          loading.classList.add('hidden');
+          alert('Something went wrong. Please try again.');
+          dropzone.parentElement.parentElement.classList.remove('hidden');
+        });
+    }
+
+    function renderResults(data) {
+      // Overlay image
+      if (data.overlay) {
+        overlayImg.src = 'data:image/jpeg;base64,' + data.overlay;
+        overlayImg.classList.remove('hidden');
+        noFace.classList.add('hidden');
+      } else {
+        overlayImg.classList.add('hidden');
+        noFace.classList.remove('hidden');
+      }
+
+      // Tone badge
+      toneBadge.textContent = data.tone.toUpperCase();
+
+      // Undertone badge
+      const emoji = { warm: '🌞', cool: '❄️', neutral: '🍂' }[data.undertone] || '';
+      undertoneBadge.textContent = emoji + ' ' + data.undertone.charAt(0).toUpperCase() + data.undertone.slice(1) + ' Undertone';
+      undertoneBadge.className = 'undertone-badge ' + data.undertone;
+
+      // Tone value
+      toneValue.textContent = `Tone value: ${data.tone_value}  ·  Scale: 0 (dark) → 1 (fair)`;
+
+      // Probability bars
+      probBars.innerHTML = '';
+      for (const [name, pct] of Object.entries(data.probs)) {
+        probBars.innerHTML += `
+          <div class="prob-row">
+            <div class="prob-label-row">
+              <span>${name.charAt(0).toUpperCase() + name.slice(1)}</span>
+              <span>${pct}%</span>
+            </div>
+            <div class="prob-bg">
+              <div class="prob-fill" style="width:${pct}%"></div>
+            </div>
+          </div>`;
+      }
+
+      // Swatches
+      swatches.innerHTML = '';
+      for (const color of data.colors) {
+        const border = color.hex === '#FFFFFF' || color.hex === '#FFFDD0'
+          ? '1px solid #ddd' : `2px solid ${color.hex}`;
+        swatches.innerHTML += `
+          <div class="swatch">
+            <div class="swatch-circle" style="background:${color.hex};border:${border}"></div>
+            <span class="swatch-name">${color.name}</span>
+            <span class="swatch-score">${color.score}</span>
+          </div>`;
+      }
+    }
+  </script>
+</body>
+</html>
